@@ -1,19 +1,8 @@
-"""
-用 quat_log.csv 回放数据，评估你正在用的 B 版本 EKF（四元数误差形式）的性能，
-并把 q_meas / q_true / q_pred(预测先验) / q_post(更新后后验) 画在同一张图里对比。
-
-用法：
-  1) 确保你的 EKF 类 AttitudeEKF7D 可 import（把下面 import 改成你的路径）
-  2) 确保 solver.solver 里的 quatShit 可用
-  3) 运行：python eval_ekf_quatlog.py
-"""
-
 import csv
 import numpy as np
 import matplotlib.pyplot as plt
 
 from solver.solver import quatShit
-# TODO: 改成你自己的导入路径
 from observer.observer import EKF as AttitudeEKF7D
 
 
@@ -38,11 +27,9 @@ def read_quat_log(csv_path: str):
             )
             w = np.array([float(row["wx"]), float(row["wy"]), float(row["wz"])], dtype=float)
 
-            # 统一归一化（日志里可能本来就归一化了，这里再做一次更稳）
             q_meas = np.asarray(quatShit.quat_normalize(q_meas), dtype=float)
             q_true = np.asarray(quatShit.quat_normalize(q_true), dtype=float)
 
-            # 处理四元数双覆盖：让 meas/true 尽量与前一帧同号，避免画图“跳变”
             if len(q_meas_list) > 0:
                 if np.dot(q_meas, q_meas_list[-1]) < 0:
                     q_meas = -q_meas
@@ -82,7 +69,6 @@ def quat_angle_error_rad(q_est, q_true):
 def run_ekf_replay(csv_path="quat_log.csv"):
     t, q_meas, q_true, w = read_quat_log(csv_path)
 
-    # 初始化 EKF：用第一帧测量作为初始姿态通常更合理
     x0 = np.zeros((7, 1), dtype=float)
     x0[0:4, 0] = q_meas[0]
     ekf = AttitudeEKF7D(x0=x0)
@@ -91,8 +77,6 @@ def run_ekf_replay(csv_path="quat_log.csv"):
     q_post_hist = np.zeros_like(q_true)  # update后（后验）
     b_hist = np.zeros((len(t), 3), dtype=float)
 
-    # dt：用 time 差分（更贴合你的日志）
-    # 如果 time 不严格递增，会做保护
     for k in range(len(t)):
         if k == 0:
             dt = float(t[1] - t[0]) if len(t) > 1 else 0.002
@@ -106,7 +90,7 @@ def run_ekf_replay(csv_path="quat_log.csv"):
         q_pred = ekf.get_quat()
         q_pred = np.asarray(quatShit.quat_normalize(q_pred), dtype=float)
 
-        # 让预测四元数的符号与真值对齐，画图更连续（不影响误差角）
+        # 让预测四元数的符号与真值对齐
         if np.dot(q_pred, q_true[k]) < 0:
             q_pred = -q_pred
         q_pred_hist[k] = q_pred
@@ -121,7 +105,7 @@ def run_ekf_replay(csv_path="quat_log.csv"):
 
         b_hist[k] = ekf.get_bias()
 
-    # 计算误差角曲线（预测先验 vs 更新后后验）
+    # 计算误差角曲线（先验 vs 后验）
     err_pred = np.array([quat_angle_error_rad(q_pred_hist[i], q_true[i]) for i in range(len(t))], dtype=float)
     err_post = np.array([quat_angle_error_rad(q_post_hist[i], q_true[i]) for i in range(len(t))], dtype=float)
 
@@ -131,7 +115,6 @@ def run_ekf_replay(csv_path="quat_log.csv"):
 def plot_quats(t, q_meas, q_true, q_pred, q_post, err_pred, err_post, b_hist):
     labels = ["w", "x", "y", "z"]
 
-    # --- Figure 1: 四元数组件对比（同一张图，4个子图）---
     fig1 = plt.figure(figsize=(14, 10))
     for i in range(4):
         ax = fig1.add_subplot(4, 1, i + 1)
@@ -146,7 +129,6 @@ def plot_quats(t, q_meas, q_true, q_pred, q_post, err_pred, err_post, b_hist):
     fig1.suptitle("Quaternion components: meas vs true vs EKF prior vs EKF posterior")
     fig1.tight_layout(rect=(0.0, 0.0, 1.0, 0.97))
 
-    # --- Figure 2: 姿态误差角（度）---
     fig2 = plt.figure(figsize=(14, 4))
     ax = fig2.add_subplot(1, 1, 1)
     ax.plot(t, np.rad2deg(err_pred), label="angle error (prior)", linewidth=1.2)
@@ -157,7 +139,6 @@ def plot_quats(t, q_meas, q_true, q_pred, q_post, err_pred, err_post, b_hist):
     ax.legend()
     fig2.tight_layout()
 
-    # --- Figure 3: gyro bias 估计（可选）---
     fig3 = plt.figure(figsize=(14, 6))
     ax = fig3.add_subplot(1, 1, 1)
     ax.plot(t, b_hist[:, 0], label="bwx")
@@ -173,6 +154,6 @@ def plot_quats(t, q_meas, q_true, q_pred, q_post, err_pred, err_post, b_hist):
 
 
 if __name__ == "__main__":
-    csv_path = "quat_log.csv"  # 改成你的路径也行
+    csv_path = "quat_log.csv"  
     t, q_meas, q_true, q_pred, q_post, b_hist, err_pred, err_post = run_ekf_replay(csv_path)
     plot_quats(t, q_meas, q_true, q_pred, q_post, err_pred, err_post, b_hist)
