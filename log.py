@@ -4,13 +4,11 @@ import os
 class QuaternionLogger:
     def __init__(self, filename="quat_log.csv"):
         """
-        filename: 输出的日志文件名
         """
         self.filename = filename
         self.file = open(self.filename, mode='w', newline='')
         self.writer = csv.writer(self.file)
 
-        # 写表头（Excel友好）
         self.writer.writerow([
             "time",
             "meas_qw", "meas_qx", "meas_qy", "meas_qz",
