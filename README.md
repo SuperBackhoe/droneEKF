@@ -1,5 +1,10 @@
 # droneEKF
 droneEKF
+eg: 
+using 7D satae: x = [qw, qx, qy, qz, bwx, bwy, bwz]^T
+using 3D mea_state: z = theta_err
+
+output: hat_q
 
 preformance as follow
 <img width="1400" height="400" alt="angle_err" src="https://github.com/user-attachments/assets/019d31f4-742c-4739-b444-824b4052268a" />
